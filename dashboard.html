@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON MARKET SCANNER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a1a;
+  --card: #12122a;
+  --card-2: #181838;
+  --cyan: #00f0ff;
+  --magenta: #ff00aa;
+  --gold: #ffcc00;
+  --green: #00ff88;
+  --red: #ff3355;
+  --text: #d8e6ff;
+  --muted: #6b7a9e;
+  --border: rgba(0, 240, 255, 0.14);
+  --glow-cyan: 0 0 12px rgba(0, 240, 255, 0.45);
+  --glow-magenta: 0 0 12px rgba(255, 0, 170, 0.4);
+  --glow-gold: 0 0 12px rgba(255, 204, 0, 0.4);
+  --font-head: 'Orbitron', 'Segoe UI', sans-serif;
+  --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
+  --topbar-h: 68px;
+  --bottombar-h: 52px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  overflow: hidden;
+}
+
+/* ===== Animated grid background ===== */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(255, 0, 170, 0.12), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 85% 100%, rgba(0, 240, 255, 0.10), transparent 55%),
+    linear-gradient(rgba(0, 240, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 42px 42px, 42px 42px;
+  animation: grid-drift 28s linear infinite;
+}
+@keyframes grid-drift {
+  0%   { background-position: 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 0 0, 0 0, 0 42px, 42px 0; }
+}
+
+.bg-scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.12) 2px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+}
+
+.app {
+  position: relative;
+  z-index: 2;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Scrollbars ===== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cyan), var(--magenta));
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+/* ===== Top bar ===== */
+.topbar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 22px;
+  background: rgba(10, 10, 26, 0.88);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 24px rgba(0, 240, 255, 0.06);
+}
+
+.logo {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: clamp(15px, 1.8vw, 22px);
+  letter-spacing: 2.5px;
+  background: linear-gradient(90deg, var(--cyan) 0%, var(--magenta) 50%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 22px rgba(0, 240, 255, 0.35);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  background: rgba(0, 255, 136, 0.08);
+  color: var(--green);
+  white-space: nowrap;
+}
+.status-pill.idle {
+  border-color: rgba(107, 122, 158, 0.4);
+  background: rgba(107, 122, 158, 0.1);
+  color: var(--muted);
+}
+.status-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: blink 1.2s ease-in-out infinite;
+}
+.status-pill.idle .status-dot {
+  background: var(--muted);
+  box-shadow: none;
+  animation: none;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.8); }
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+  margin-left: auto;
+}
+
+.url-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(18, 18, 42, 0.9);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.url-input:focus {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.url-input::placeholder { color: var(--muted); }
+
+.btn {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1.8px;
+  padding: 12px 22px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.2s, filter 0.2s;
+  white-space: nowrap;
+  user-select: none;
+}
+.btn:active { transform: scale(0.96); }
+
+.btn-start {
+  background: linear-gradient(135deg, #00c853, var(--green));
+  color: #04220f;
+  box-shadow: 0 0 18px rgba(0, 255, 136, 0.35);
+}
+.btn-start:hover { filter: brightness(1.12); box-shadow: 0 0 26px rgba(0, 255, 136, 0.55); }
+
+.btn-stop {
+  background: linear-gradient(135deg, #c2185b, var(--red));
+  color: #fff;
+  box-shadow: 0 0 18px rgba(255, 51, 85, 0.35);
+}
+.btn-stop:hover { filter: brightness(1.12); box-shadow: 0 0 26px rgba(255, 51, 85, 0.55); }
+
+/* ===== Main 3-column layout ===== */
+.main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 1.05fr) minmax(320px, 1.15fr) minmax(340px, 1.35fr);
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: rgba(18, 18, 42, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.col-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.07), transparent);
+}
+.col-title {
+  font-family: var(--font-head);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+.col-title.magenta { color: var(--magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.5); }
+.col-title.gold    { color: var(--gold);    text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
+
+.col-badge {
+  margin-left: auto;
+  font-family: var(--font-head);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: var(--cyan);
+}
+
+.col-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px;
+}
+
+/* ===== Left: video ===== */
+.col-video { position: relative; }
+.col-video .col-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #050510;
+  border: 1px solid var(--border);
+  box-shadow: 0 0 28px rgba(0, 240, 255, 0.12);
+}
+.video-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(0, 240, 255, 0.08), transparent 60%),
+    #06061a;
+}
+.video-placeholder.hidden { display: none; }
+
+.radar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  background:
+    radial-gradient(circle, transparent 28%, rgba(0, 240, 255, 0.12) 29%, transparent 31%),
+    radial-gradient(circle, transparent 58%, rgba(0, 240, 255, 0.12) 59%, transparent 61%),
+    radial-gradient(circle, rgba(0, 240, 255, 0.06), transparent 70%);
+}
+.radar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(0, 240, 255, 0.5), transparent 28%);
+  animation: radar-sweep 2.4s linear infinite;
+}
+.radar::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 8px; height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+}
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.radar-pulse {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  animation: radar-pulse 2.4s ease-out infinite;
+}
+@keyframes radar-pulse {
+  0%   { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+.placeholder-text {
+  font-family: var(--font-head);
+  font-size: 11px;
+  letter-spacing: 2.4px;
+  color: var(--muted);
+}
+
+.video-meta {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+  width: 100%;
+}
+.video-meta strong { color: var(--cyan); font-weight: 600; }
+
+/* ===== Center: transcript ===== */
+.feed-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--muted);
+  font-size: 14px;
+  letter-spacing: 0.6px;
+}
+
+.t-entry {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--card-2);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  border-left: 3px solid var(--cyan);
+  animation: fade-slide-up 0.35s ease both;
+}
+.t-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.t-time {
+  font-family: var(--font-head);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--cyan);
+}
+.t-tag {
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 0, 170, 0.12);
+  color: var(--magenta);
+  border: 1px solid rgba(255, 0, 170, 0.25);
+  font-weight: 600;
+}
+.t-text {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text);
+  font-weight: 500;
+  word-wrap: break-word;
+}
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Right: alerts ===== */
+.alert-card {
+  margin-bottom: 14px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  background: linear-gradient(155deg, var(--card) 0%, var(--card-2) 100%);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--cyan);
+  animation: alert-slide-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: relative;
+}
+.alert-card.urgency-high   { border-left-color: var(--red);    box-shadow: 0 0 18px rgba(255, 51, 85, 0.18); }
+.alert-card.urgency-medium { border-left-color: var(--gold);   box-shadow: 0 0 18px rgba(255, 204, 0, 0.14); }
+.alert-card.urgency-low    { border-left-color: var(--cyan);   box-shadow: 0 0 18px rgba(0, 240, 255, 0.12); }
+
+@keyframes alert-slide-in {
+  0%   { opacity: 0; transform: translateX(36px) scale(0.97); filter: brightness(1.6); }
+  60%  { filter: brightness(1.15); }
+  100% { opacity: 1; transform: translateX(0) scale(1); filter: brightness(1); }
+}
+
+.alert-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.alert-time {
+  font-family: var(--font-head);
+  font-size: 10px;
+  letter-spacing: 1.1px;
+  color: var(--muted);
+}
+
+.badge {
+  font-family: var(--font-head);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.badge-bullish { color: var(--green); border-color: rgba(0, 255, 136, 0.4); background: rgba(0, 255, 136, 0.1); }
+.badge-bearish { color: var(--red);   border-color: rgba(255, 51, 85, 0.4);  background: rgba(255, 51, 85, 0.1); }
+.badge-neutral { color: var(--muted); border-color: rgba(107, 122, 158, 0.4); background: rgba(107, 122, 158, 0.12); }
+
+.urgency-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+.urgency-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+.urgency-dot.high   { background: var(--red);  box-shadow: 0 0 8px var(--red);  animation: blink 1s ease-in-out infinite; }
+.urgency-dot.medium { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.urgency-dot.low    { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+
+.alert-summary {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.section-label {
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: var(--muted);
+  margin: 10px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.25), transparent);
+}
+
+.stock-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  margin-bottom: 7px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.stock-ticker {
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  min-width: 72px;
+}
+.stock-ticker.up   { color: var(--green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.45); }
+.stock-ticker.down { color: var(--red);   text-shadow: 0 0 10px rgba(255, 51, 85, 0.45); }
+
+.stock-info { flex: 1; min-width: 0; }
+.stock-reason {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.stock-conf {
+  font-family: var(--font-head);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.35);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: var(--cyan);
+}
+.chip.sector { background: rgba(255, 0, 170, 0.08); border-color: rgba(255, 0, 170, 0.22); color: var(--magenta); }
+.chip.poly   { background: rgba(255, 204, 0, 0.08); border-color: rgba(255, 204, 0, 0.22); color: var(--gold); }
+.chip.kw     { background: rgba(107, 122, 158, 0.12); border-color: rgba(107, 122, 158, 0.25); color: var(--muted); }
+.chip.poly-link {
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--cyan);
+  border-color: rgba(0, 240, 255, 0.35);
+  background: rgba(0, 240, 255, 0.08);
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.12s;
+}
+.chip.poly-link:hover {
+  color: var(--magenta);
+  border-color: rgba(255, 0, 170, 0.55);
+  box-shadow: 0 0 14px rgba(255, 0, 170, 0.45), 0 0 22px rgba(0, 240, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.trade-signal {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.14), rgba(255, 204, 0, 0.05));
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow: 0 0 16px rgba(255, 204, 0, 0.12);
+}
+.trade-signal .ts-label {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  margin-bottom: 4px;
+  opacity: 0.85;
+}
+
+.alert-source {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.75;
+  line-height: 1.45;
+  max-height: 2.9em;
+  overflow: hidden;
+}
+
+/* ===== Bottom bar ===== */
+.bottombar {
+  height: var(--bottombar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 0 22px;
+  background: rgba(10, 10, 26, 0.9);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  overflow-x: auto;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+.stat-label {
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: var(--muted);
+}
+.stat-value {
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+.stat-value.green { color: var(--green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.4); }
+.stat-value.red   { color: var(--red);   text-shadow: 0 0 10px rgba(255, 51, 85, 0.4); }
+.stat-value.gold  { color: var(--gold);  text-shadow: 0 0 10px rgba(255, 204, 0, 0.4); }
+
+.conn-note {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+}
+.conn-note::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.conn-note.live { color: var(--green); }
+.conn-note.idle { color: var(--green); opacity: 0.7; }
+.conn-note.idle::before { box-shadow: none; animation: none; }
+.conn-note.reconnecting { color: var(--gold); }
+.conn-note.down { color: var(--red); }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  bottom: calc(var(--bottombar-h) + 18px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 12px 22px;
+  border-radius: 12px;
+  background: rgba(18, 18, 42, 0.95);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.25);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 100;
+  max-width: 90vw;
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { border-color: var(--red); box-shadow: 0 0 24px rgba(255, 51, 85, 0.3); }
+
+/* ===== Responsive ===== */
+@media (max-width: 1280px) {
+  .main {
+    grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.1fr) minmax(300px, 1.2fr);
+    gap: 10px;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 980px) {
+  html, body { overflow: auto; height: auto; }
+  .app { height: auto; min-height: 100vh; }
+  .main {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    overflow: visible;
+  }
+  .col { max-height: none; }
+  .col-body { max-height: 420px; }
+  .col-video .col-body { max-height: none; }
+  .col-video { order: -1; }
+  .topbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .controls { margin-left: 0; width: 100%; max-width: none; flex-wrap: wrap; }
+  .url-input { flex-basis: 100%; }
+  .logo { width: 100%; }
+  .bottombar {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 14px 22px;
+    padding: 12px 16px;
+  }
+  .conn-note { margin-left: 0; }
+}
+
+@media (max-width: 560px) {
+  .logo { font-size: 15px; letter-spacing: 1.4px; }
+  .btn { padding: 11px 16px; letter-spacing: 1.2px; }
+  .col-body { padding: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-scanlines"></div>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo">NEON MARKET SCANNER</div>
+    <div class="status-pill idle" id="statusPill">
+      <span class="status-dot"></span>
+      <span id="statusText">IDLE</span>
+    </div>
+    <div class="controls">
+      <input class="url-input" id="urlInput" type="text" placeholder="YouTube URL or video ID..." spellcheck="false" autocomplete="off">
+      <button class="btn btn-start" id="btnStart">START</button>
+      <button class="btn btn-stop" id="btnStop">STOP</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- LEFT: VIDEO -->
+    <section class="col col-video">
+      <div class="col-header">
+        <div class="col-title">VIDEO FEED</div>
+        <div class="col-badge" id="videoBadge">NO SIGNAL</div>
+      </div>
+      <div class="col-body">
+        <div style="width:100%">
+          <div class="video-wrap" id="videoWrap">
+            <div class="video-placeholder" id="videoPlaceholder">
+              <div class="radar"><div class="radar-pulse"></div></div>
+              <div class="placeholder-text">AWAITING SIGNAL</div>
+            </div>
+          </div>
+          <div class="video-meta" id="videoMeta">
+            <strong>Source:</strong> <span id="sourceLabel">none</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER: TRANSCRIPT -->
+    <section class="col">
+      <div class="col-header">
+        <div class="col-title magenta">LIVE TRANSCRIPT</div>
+        <div class="col-badge" id="feedBadge">0</div>
+      </div>
+      <div class="col-body" id="transcriptFeed">
+        <div class="feed-empty" id="feedEmpty">Waiting for speech segments…</div>
+      </div>
+    </section>
+
+    <!-- RIGHT: ALERTS -->
+    <section class="col">
+      <div class="col-header">
+        <div class="col-title gold">MARKET ALERTS</div>
+        <div class="col-badge" id="alertBadge">0</div>
+      </div>
+      <div class="col-body" id="alertFeed">
+        <div class="feed-empty" id="alertEmpty">No alerts yet. Press START — each segment is analyzed automatically.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM BAR -->
+  <footer class="bottombar">
+    <div class="stat">
+      <span class="stat-label">SEGMENTS</span>
+      <span class="stat-value" id="statSegments">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">BULLISH</span>
+      <span class="stat-value green" id="statBullish">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">BEARISH</span>
+      <span class="stat-value red" id="statBearish">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">TOP TICKER</span>
+      <span class="stat-value gold" id="statTicker">—</span>
+    </div>
+    <div class="conn-note" id="connNote">SSE: CONNECTING…</div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const statusPill = $('statusPill');
+  const statusText = $('statusText');
+  const urlInput = $('urlInput');
+  const btnStart = $('btnStart');
+  const btnStop = $('btnStop');
+  const videoWrap = $('videoWrap');
+  const videoPlaceholder = $('videoPlaceholder');
+  const videoBadge = $('videoBadge');
+  const sourceLabel = $('sourceLabel');
+  const transcriptFeed = $('transcriptFeed');
+  const feedEmpty = $('feedEmpty');
+  const feedBadge = $('feedBadge');
+  const alertFeed = $('alertFeed');
+  const alertEmpty = $('alertEmpty');
+  const alertBadge = $('alertBadge');
+  const statSegments = $('statSegments');
+  const statBullish = $('statBullish');
+  const statBearish = $('statBearish');
+  const statTicker = $('statTicker');
+  const connNote = $('connNote');
+  const toastEl = $('toast');
+
+  // ---------- State ----------
+  const state = {
+    alertCount: 0,
+    transcriptCount: 0,
+    bullish: 0,
+    bearish: 0,
+    tickerCounts: {},
+    seenAlerts: new Set(),
+    seenTranscripts: new Set(),
+    pipelineRunning: false
+  };
+
+  // ---------- Helpers ----------
+  function extractYouTubeId(url) {
+    if (!url) return null;
+    const s = String(url).trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+
+    let m = s.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    return null;
+  }
+
+  function extractTweetId(url) {
+    if (!url) return null;
+    const s = String(url).trim();
+    // x.com/username/status/1234567890 or twitter.com/username/status/1234567890
+    let m = s.match(/(?:x|twitter)\.com\/\w+\/status\/(\d+)/);
+    if (m) return m[1];
+    return null;
+  }
+
+  function detectPlatform(url) {
+    const s = String(url || '').toLowerCase();
+    if (/youtube|youtu\.be/.test(s)) return 'youtube';
+    if (/x\.com|twitter\.com|t\.co/.test(s)) return 'twitter';
+    return 'unknown';
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function formatTime(iso) {
+    if (!iso) return '--:--:--';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso).slice(11, 19) || String(iso).slice(0, 8) || '--:--:--';
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    } catch (e) {
+      return '--:--:--';
+    }
+  }
+
+  function formatConf(c) {
+    if (c == null || isNaN(c)) return '—';
+    const n = Number(c);
+    const pct = n <= 1 ? n * 100 : n;
+    return pct.toFixed(0) + '%';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function debounce(fn, ms) {
+    let t;
+    return function () {
+      clearTimeout(t);
+      const args = arguments, ctx = this;
+      t = setTimeout(() => fn.apply(ctx, args), ms);
+    };
+  }
+
+  let toastTimer = null;
+  function toast(msg, isErr) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle('err', !!isErr);
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3200);
+  }
+
+  // ---------- Status pill ----------
+  function setPipelineStatus(running) {
+    state.pipelineRunning = !!running;
+    if (running) {
+      statusPill.classList.remove('idle');
+      statusText.textContent = 'LIVE';
+    } else {
+      statusPill.classList.add('idle');
+      statusText.textContent = 'IDLE';
+    }
+    btnStart.disabled = !!running;
+    btnStop.disabled = !running;
+  }
+
+  // ---------- Video ----------
+  function setYouTubeVideo(url) {
+    const platform = detectPlatform(url);
+
+    if (platform === 'twitter') {
+      const tid = extractTweetId(url);
+      if (!tid) {
+        toast('Could not parse a Twitter/X status ID', true);
+        return;
+      }
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://platform.twitter.com/embed/Tweet.html?id=' + tid + '&theme=dark&autoplay=1';
+      iframe.allow = 'autoplay; encrypted-media';
+      iframe.allowFullscreen = true;
+      iframe.title = 'X/Twitter post';
+      iframe.style.minHeight = '480px';
+      const old = videoWrap.querySelector('iframe');
+      if (old) old.remove();
+      videoPlaceholder.classList.add('hidden');
+      videoWrap.appendChild(iframe);
+      videoBadge.textContent = 'X / TWITTER';
+      videoBadge.style.color = 'var(--cyan)';
+      videoBadge.style.borderColor = 'rgba(0,240,255,0.35)';
+      return;
+    }
+
+    const id = extractYouTubeId(url);
+    if (!id) {
+      if (url && String(url).length > 0) {
+        toast('Could not parse video ID (supported: YouTube, X/Twitter)', true);
+      }
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.src = 'https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    iframe.title = 'YouTube live stream';
+
+    // remove old iframe if any
+    const old = videoWrap.querySelector('iframe');
+    if (old) old.remove();
+    videoPlaceholder.classList.add('hidden');
+    videoWrap.appendChild(iframe);
+    videoBadge.textContent = 'LIVE';
+    videoBadge.style.color = 'var(--green)';
+    videoBadge.style.borderColor = 'rgba(0,255,136,0.35)';
+  }
+
+  function clearYouTubeVideo() {
+    const old = videoWrap.querySelector('iframe');
+    if (old) old.remove();
+    videoPlaceholder.classList.remove('hidden');
+    videoBadge.textContent = 'NO SIGNAL';
+    videoBadge.style.color = '';
+    videoBadge.style.borderColor = '';
+  }
+
+  // ---------- Transcript rendering ----------
+  function renderTranscriptEntry(ts, text, key) {
+    if (key && state.seenTranscripts.has(key)) return;
+    if (key) state.seenTranscripts.add(key);
+
+    if (feedEmpty && feedEmpty.parentNode) feedEmpty.remove();
+
+    const el = document.createElement('div');
+    el.className = 't-entry';
+    el.innerHTML =
+      '<div class="t-entry-head">' +
+        '<span class="t-time">' + escapeHtml(formatTime(ts)) + '</span>' +
+        '<span class="t-tag">SPEECH</span>' +
+      '</div>' +
+      '<div class="t-text">' + escapeHtml(text) + '</div>';
+
+    transcriptFeed.insertBefore(el, transcriptFeed.firstChild);
+    state.transcriptCount++;
+    feedBadge.textContent = String(state.transcriptCount);
+
+    // keep DOM bounded
+    while (transcriptFeed.children.length > 200) {
+      transcriptFeed.removeChild(transcriptFeed.lastChild);
+    }
+  }
+
+  // ---------- Alert rendering ----------
+  function urgencyClass(u) {
+    const s = String(u || 'low').toLowerCase();
+    if (s === 'high') return 'high';
+    if (s === 'medium') return 'medium';
+    return 'low';
+  }
+
+  function sentimentBadge(sent) {
+    const s = String(sent || 'neutral').toLowerCase();
+    if (s === 'bullish') return '<span class="badge badge-bullish">BULLISH</span>';
+    if (s === 'bearish') return '<span class="badge badge-bearish">BEARISH</span>';
+    return '<span class="badge badge-neutral">NEUTRAL</span>';
+  }
+
+  function renderStocks(stocks) {
+    if (!stocks || !stocks.length) return '';
+    let html = '<div class="section-label">STOCKS</div>';
+    stocks.forEach(function (st) {
+      const dir = String(st.direction || 'up').toLowerCase() === 'down' ? 'down' : 'up';
+      const arrow = dir === 'up' ? '🟢↑' : '🔴↓';
+      html +=
+        '<div class="stock-row">' +
+          '<div class="stock-ticker ' + dir + '">' + arrow + ' ' + escapeHtml(st.ticker || '?') + '</div>' +
+          '<div class="stock-info">' +
+            '<div class="stock-reason">' + escapeHtml(st.reason || '') + '</div>' +
+          '</div>' +
+          '<div class="stock-conf" data-conf="' + escapeHtml(String(st.confidence != null ? st.confidence : '')) + '">' +
+            formatConf(st.confidence) +
+          '</div>' +
+        '</div>';
+    });
+    return html;
+  }
+
+  function renderChips(label, items, cls) {
+    if (!items || !items.length) return '';
+    let html = '<div class="section-label">' + label + '</div><div class="chip-row">';
+    items.forEach(function (it) {
+      let text;
+      if (typeof it === 'string') text = it;
+      else if (it && typeof it === 'object') {
+        text = it.name || it.title || it.label || it.keyword || it.ticker || it.question || JSON.stringify(it);
+      } else text = String(it);
+      html += '<span class="chip ' + cls + '">' + escapeHtml(text) + '</span>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function polymarketHref(it) {
+    if (!it || typeof it !== 'object') return null;
+    if (it.url) {
+      const u = String(it.url).trim();
+      if (/^https?:\/\//i.test(u)) return u;
+      // bare slug/path → polymarket event URL
+      return 'https://polymarket.com/event/' + u.replace(/^\/+/, '');
+    }
+    if (it.slug) {
+      return 'https://polymarket.com/event/' + String(it.slug).replace(/^\/+/, '');
+    }
+    return null;
+  }
+
+  function renderPolymarket(items) {
+    if (!items || !items.length) return '';
+    let html = '<div class="section-label">POLYMARKET</div><div class="chip-row">';
+    items.forEach(function (it) {
+      let question, conf;
+      if (typeof it === 'string') {
+        question = it;
+      } else if (it && typeof it === 'object') {
+        question = it.question || it.name || it.title || it.label || it.market || it.keyword || '';
+        conf = it.confidence != null ? it.confidence
+             : it.prob != null ? it.prob
+             : it.probability != null ? it.probability
+             : null;
+        if (!question) question = it.slug || it.url || JSON.stringify(it);
+      } else {
+        question = String(it);
+      }
+      const text = (conf != null && conf !== '' && !isNaN(Number(conf)))
+        ? question + ' (' + formatConf(conf) + ')'
+        : question;
+      const href = polymarketHref(it);
+      if (href) {
+        html += '<a class="chip poly-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(text) + '</a>';
+      } else {
+        html += '<span class="chip poly">' + escapeHtml(text) + '</span>';
+      }
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function alertKey(entry) {
+    return (entry.ts || '') + '|' + (entry.text || '').slice(0, 80);
+  }
+
+  function renderAlert(entry, prepend) {
+    const key = alertKey(entry);
+    if (state.seenAlerts.has(key)) return;
+    state.seenAlerts.add(key);
+
+    if (alertEmpty && alertEmpty.parentNode) alertEmpty.remove();
+
+    const a = entry.analysis || {};
+    const urgency = urgencyClass(a.urgency);
+    const sentiment = String(a.sentiment || 'neutral').toLowerCase();
+
+    if (sentiment === 'bullish') state.bullish++;
+    else if (sentiment === 'bearish') state.bearish++;
+
+    const stocks = a.stocks || [];
+    stocks.forEach(function (st) {
+      const t = String(st.ticker || '?').toUpperCase();
+      state.tickerCounts[t] = (state.tickerCounts[t] || 0) + 1;
+    });
+
+    const card = document.createElement('div');
+    card.className = 'alert-card urgency-' + urgency;
+
+    let html = '';
+    html += '<div class="alert-top">';
+    html += '<span class="alert-time">' + escapeHtml(formatTime(entry.ts)) + '</span>';
+    html += sentimentBadge(a.sentiment);
+    html += '<span class="urgency-chip"><span class="urgency-dot ' + urgency + '"></span>' + urgency.toUpperCase() + '</span>';
+    html += '</div>';
+
+    html += '<div class="alert-summary">' + escapeHtml(a.summary || entry.text || '(no summary)') + '</div>';
+    html += renderStocks(stocks);
+    html += renderChips('SECTORS', a.sectors, 'sector');
+    html += renderPolymarket(a.polymarket);
+    html += renderChips('KEYWORDS', a.keywords, 'kw');
+
+    if (a.trade_signal) {
+      html += '<div class="trade-signal"><span class="ts-label">TRADE SIGNAL</span>' + escapeHtml(a.trade_signal) + '</div>';
+    }
+
+    if (entry.text && entry.text !== a.summary) {
+      html += '<div class="alert-source">' + escapeHtml(entry.text) + '</div>';
+    }
+
+    card.innerHTML = html;
+
+    if (prepend !== false) alertFeed.insertBefore(card, alertFeed.firstChild);
+    else alertFeed.appendChild(card);
+
+    state.alertCount++;
+    alertBadge.textContent = String(state.alertCount);
+
+    while (alertFeed.children.length > 150) {
+      alertFeed.removeChild(alertFeed.lastChild);
+    }
+
+    updateStats();
+  }
+
+  function updateStats() {
+    statSegments.textContent = String(state.transcriptCount || state.alertCount);
+    statBullish.textContent = String(state.bullish);
+    statBearish.textContent = String(state.bearish);
+
+    let top = '—';
+    let topN = 0;
+    Object.keys(state.tickerCounts).forEach(function (t) {
+      if (state.tickerCounts[t] > topN) {
+        topN = state.tickerCounts[t];
+        top = t;
+      }
+    });
+    statTicker.textContent = top;
+  }
+
+  // ---------- Data intake ----------
+  function ingestEntry(entry) {
+    if (!entry) return;
+
+    // transcript side
+    if (entry.text) {
+      renderTranscriptEntry(entry.ts, entry.text, alertKey(entry));
+    }
+
+    // alert side (only when analysis present)
+    if (entry.analysis) {
+      renderAlert(entry, true);
+    }
+
+    // stat segments reflects backend counter if larger
+    if (typeof entry.segments_analyzed === 'number') {
+      // no-op; kept for forward-compat
+    }
+  }
+
+  // ---------- API ----------
+  async function fetchAlerts() {
+    try {
+      const res = await fetch('/api/alerts?limit=30');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.alerts || []);
+      // oldest first so newest ends up on top
+      list.slice().reverse().forEach(function (entry) {
+        ingestEntry(entry);
+      });
+    } catch (e) {
+      console.warn('fetchAlerts failed', e);
+    }
+  }
+
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/api/status');
+      if (!res.ok) return;
+      const st = await res.json();
+      setPipelineStatus(st.pipeline_running);
+      if (st.source) {
+        sourceLabel.textContent = st.source;
+      }
+      if (typeof st.segments_analyzed === 'number' && st.segments_analyzed > state.transcriptCount) {
+        // don't fabricate entries; just reflect a higher count if backend knows more
+        // only if we have zero local entries
+      }
+    } catch (e) {
+      /* backend offline — pill stays as-is */
+    }
+  }
+
+  async function postStart(source) {
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: source })
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error('start failed: HTTP ' + res.status + ' ' + t);
+    }
+    return res.json().catch(() => ({}));
+  }
+
+  async function postStop() {
+    const res = await fetch('/api/stop', { method: 'POST' });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error('stop failed: HTTP ' + res.status + ' ' + t);
+    }
+    return res.json().catch(() => ({}));
+  }
+
+  // ---------- SSE ----------
+  let eventSource = null;
+  let sseRetries = 0;
+  let sseLastMessageAt = 0;
+  let sseReconnectTimer = null;
+  let sseBriefTimer = null;
+
+  function setSseStatus(kind) {
+    connNote.classList.remove('live', 'idle', 'reconnecting', 'down');
+    if (kind === 'connected') {
+      connNote.classList.add('live');
+      connNote.textContent = 'SSE: CONNECTED';
+    } else if (kind === 'idle') {
+      connNote.classList.add('live', 'idle');
+      connNote.textContent = 'SSE: CONNECTED (IDLE)';
+    } else if (kind === 'reconnecting') {
+      connNote.classList.add('reconnecting');
+      connNote.textContent = 'SSE: RECONNECTING';
+    } else if (kind === 'disconnected') {
+      connNote.classList.add('down');
+      connNote.textContent = 'SSE: DISCONNECTED';
+    } else {
+      connNote.classList.add('reconnecting');
+      connNote.textContent = 'SSE: CONNECTING…';
+    }
+  }
+
+  function connectSSE() {
+    if (sseReconnectTimer) {
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = null;
+    }
+    if (eventSource) {
+      try { eventSource.close(); } catch (e) {}
+      eventSource = null;
+    }
+    setSseStatus('connecting');
+    eventSource = new EventSource('/api/stream');
+
+    eventSource.onopen = function () {
+      sseRetries = 0;
+      sseLastMessageAt = Date.now();
+      setSseStatus('connected');
+    };
+
+    eventSource.onmessage = function (ev) {
+      sseLastMessageAt = Date.now();
+      setSseStatus('connected');
+      if (!ev.data) return;
+      let entry;
+      try {
+        entry = JSON.parse(ev.data);
+      } catch (e) {
+        console.warn('bad SSE payload', ev.data);
+        return;
+      }
+      ingestEntry(entry);
+    };
+
+    eventSource.onerror = function () {
+      try { eventSource.close(); } catch (e) {}
+      eventSource = null;
+      sseRetries++;
+      // RECONNECTING only briefly — if the outage lasts, flip to DISCONNECTED
+      setSseStatus('reconnecting');
+      if (sseBriefTimer) clearTimeout(sseBriefTimer);
+      sseBriefTimer = setTimeout(function () {
+        if (!eventSource || eventSource.readyState !== EventSource.OPEN) {
+          setSseStatus('disconnected');
+        }
+      }, 3000);
+      const delay = Math.min(1000 * Math.pow(1.6, sseRetries), 15000);
+      sseReconnectTimer = setTimeout(connectSSE, delay);
+    };
+  }
+
+  // Heartbeat: an open-but-quiet stream is CONNECTED (idle), not RECONNECTING
+  setInterval(function () {
+    const open = eventSource && eventSource.readyState === EventSource.OPEN;
+    if (!open) return; // reconnect path owns the label
+    if (Date.now() - sseLastMessageAt > 60000) {
+      setSseStatus('idle');
+    } else {
+      setSseStatus('connected');
+    }
+  }, 5000);
+
+  // ---------- Actions ----------
+  const doStart = debounce(async function () {
+    const url = urlInput.value.trim();
+    if (!url) {
+      toast('Enter a YouTube URL first', true);
+      return;
+    }
+    try {
+      setYouTubeVideo(url);
+      await postStart(url);
+      sourceLabel.textContent = url;
+      setPipelineStatus(true);
+      toast('Pipeline started');
+    } catch (e) {
+      console.error(e);
+      toast(e.message || 'START failed', true);
+    }
+  }, 250);
+
+  const doStop = debounce(async function () {
+    try {
+      await postStop();
+      setPipelineStatus(false);
+      toast('Pipeline stopped');
+    } catch (e) {
+      console.error(e);
+      toast(e.message || 'STOP failed', true);
+    }
+  }, 250);
+
+  btnStart.addEventListener('click', doStart);
+  btnStop.addEventListener('click', doStop);
+
+  urlInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doStart();
+    }
+  });
+
+  // ---------- Count-up animation for confidence (lightweight) ----------
+  function animateCountUps(root) {
+    const nodes = (root || document).querySelectorAll('.stock-conf[data-conf]');
+    nodes.forEach(function (el) {
+      if (el.dataset.done === '1') return;
+      const raw = el.getAttribute('data-conf');
+      if (raw == null || raw === '' || isNaN(Number(raw))) return;
+      el.dataset.done = '1';
+      const target = Number(raw);
+      const end = target <= 1 ? target * 100 : target;
+      const start = 0;
+      const dur = 700;
+      const t0 = performance.now();
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = (start + (end - start) * eased).toFixed(0) + '%';
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Observe alert feed for new confidence numbers
+  const mo = new MutationObserver(function () {
+    animateCountUps(alertFeed);
+  });
+  mo.observe(alertFeed, { childList: true });
+
+  // ---------- Boot ----------
+  setPipelineStatus(false);
+  fetchAlerts().then(animateCountUps);
+  connectSSE();
+  fetchStatus();
+  setInterval(fetchStatus, 5000);
+
+  // If backend already has a source, show it
+  fetchStatus();
+})();
+</script>
+</body>
+</html>

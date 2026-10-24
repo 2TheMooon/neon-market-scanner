@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON MARKET SCANNER — Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a1a;
+  --card: #12122a;
+  --card-2: #181838;
+  --cyan: #00f0ff;
+  --magenta: #ff00aa;
+  --gold: #ffcc00;
+  --green: #00ff88;
+  --red: #ff3355;
+  --text: #d8e6ff;
+  --muted: #6b7a9e;
+  --border: rgba(0, 240, 255, 0.14);
+  --glow-cyan: 0 0 12px rgba(0, 240, 255, 0.45);
+  --glow-magenta: 0 0 12px rgba(255, 0, 170, 0.4);
+  --glow-gold: 0 0 12px rgba(255, 204, 0, 0.4);
+  --font-head: 'Orbitron', 'Segoe UI', sans-serif;
+  --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
+  --topbar-h: 68px;
+  --bottombar-h: 52px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  overflow: hidden;
+}
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(255, 0, 170, 0.12), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 85% 100%, rgba(0, 240, 255, 0.10), transparent 55%),
+    linear-gradient(rgba(0, 240, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 42px 42px, 42px 42px;
+  animation: grid-drift 28s linear infinite;
+}
+@keyframes grid-drift {
+  0%   { background-position: 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 0 0, 0 0, 0 42px, 42px 0; }
+}
+
+.bg-scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.12) 2px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+}
+
+.app {
+  position: relative;
+  z-index: 2;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cyan), var(--magenta));
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+.topbar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 22px;
+  background: rgba(10, 10, 26, 0.88);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 24px rgba(0, 240, 255, 0.06);
+}
+
+.logo {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: clamp(15px, 1.8vw, 22px);
+  letter-spacing: 2.5px;
+  background: linear-gradient(90deg, var(--cyan) 0%, var(--magenta) 50%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 22px rgba(0, 240, 255, 0.35);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  background: rgba(0, 255, 136, 0.08);
+  color: var(--green);
+  white-space: nowrap;
+}
+.status-pill.idle {
+  border-color: rgba(107, 122, 158, 0.4);
+  background: rgba(107, 122, 158, 0.1);
+  color: var(--muted);
+}
+.status-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: blink 1.2s ease-in-out infinite;
+}
+.status-pill.idle .status-dot {
+  background: var(--muted);
+  box-shadow: none;
+  animation: none;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.8); }
+}
+
+.sim-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  border: 1px solid rgba(255, 0, 170, 0.45);
+  background: rgba(255, 0, 170, 0.12);
+  color: var(--magenta);
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(255, 0, 170, 0.25);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+  margin-left: auto;
+}
+
+.url-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(18, 18, 42, 0.9);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.url-input:focus {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.url-input::placeholder { color: var(--muted); }
+
+.btn {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1.8px;
+  padding: 12px 22px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.2s, filter 0.2s;
+  white-space: nowrap;
+  user-select: none;
+}
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.4); }
+
+.btn-start {
+  background: linear-gradient(135deg, #00c853, var(--green));
+  color: #04220f;
+  box-shadow: 0 0 18px rgba(0, 255, 136, 0.35);
+}
+.btn-start:hover { filter: brightness(1.12); box-shadow: 0 0 26px rgba(0, 255, 136, 0.55); }
+
+.btn-stop {
+  background: linear-gradient(135deg, #c2185b, var(--red));
+  color: #fff;
+  box-shadow: 0 0 18px rgba(255, 51, 85, 0.35);
+}
+.btn-stop:hover { filter: brightness(1.12); box-shadow: 0 0 26px rgba(255, 51, 85, 0.55); }
+
+.btn-analyze {
+  background: linear-gradient(135deg, #7b1fa2, var(--magenta));
+  color: #fff;
+  box-shadow: 0 0 18px rgba(255, 0, 170, 0.35);
+}
+.btn-analyze:hover { filter: brightness(1.12); box-shadow: 0 0 26px rgba(255, 0, 170, 0.55); }
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 1.05fr) minmax(320px, 1.15fr) minmax(340px, 1.35fr);
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: rgba(18, 18, 42, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.col-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.07), transparent);
+}
+.col-title {
+  font-family: var(--font-head);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+.col-title.magenta { color: var(--magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.5); }
+.col-title.gold    { color: var(--gold);    text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
+
+.col-badge {
+  margin-left: auto;
+  font-family: var(--font-head);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: var(--cyan);
+}
+
+.col-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px;
+}
+
+.col-video { position: relative; }
+.col-video .col-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #050510;
+  border: 1px solid var(--border);
+  box-shadow: 0 0 28px rgba(0, 240, 255, 0.12);
+}
+.video-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(0, 240, 255, 0.08), transparent 60%),
+    #06061a;
+}
+.video-placeholder.hidden { display: none; }
+
+.radar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  background:
+    radial-gradient(circle, transparent 28%, rgba(0, 240, 255, 0.12) 29%, transparent 31%),
+    radial-gradient(circle, transparent 58%, rgba(0, 240, 255, 0.12) 59%, transparent 61%),
+    radial-gradient(circle, rgba(0, 240, 255, 0.06), transparent 70%);
+}
+.radar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(0, 240, 255, 0.5), transparent 28%);
+  animation: radar-sweep 2.4s linear infinite;
+}
+.radar::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 8px; height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+}
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.radar-pulse {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  animation: radar-pulse 2.4s ease-out infinite;
+}
+@keyframes radar-pulse {
+  0%   { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+.placeholder-text {
+  font-family: var(--font-head);
+  font-size: 11px;
+  letter-spacing: 2.4px;
+  color: var(--muted);
+}
+
+.video-meta {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+  width: 100%;
+}
+.video-meta strong { color: var(--cyan); font-weight: 600; }
+
+.feed-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--muted);
+  font-size: 14px;
+  letter-spacing: 0.6px;
+}
+
+.t-entry {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--card-2);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  border-left: 3px solid var(--cyan);
+  animation: fade-slide-up 0.35s ease both;
+}
+.t-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.t-time {
+  font-family: var(--font-head);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--cyan);
+}
+.t-tag {
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 0, 170, 0.12);
+  color: var(--magenta);
+  border: 1px solid rgba(255, 0, 170, 0.25);
+  font-weight: 600;
+}
+.t-text {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text);
+  font-weight: 500;
+  word-wrap: break-word;
+}
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.alert-card {
+  margin-bottom: 14px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  background: linear-gradient(155deg, var(--card) 0%, var(--card-2) 100%);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--cyan);
+  animation: alert-slide-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: relative;
+}
+.alert-card.urgency-high   { border-left-color: var(--red);    box-shadow: 0 0 18px rgba(255, 51, 85, 0.18); }
+.alert-card.urgency-medium { border-left-color: var(--gold);   box-shadow: 0 0 18px rgba(255, 204, 0, 0.14); }
+.alert-card.urgency-low    { border-left-color: var(--cyan);   box-shadow: 0 0 18px rgba(0, 240, 255, 0.12); }
+
+@keyframes alert-slide-in {
+  0%   { opacity: 0; transform: translateX(36px) scale(0.97); filter: brightness(1.6); }
+  60%  { filter: brightness(1.15); }
+  100% { opacity: 1; transform: translateX(0) scale(1); filter: brightness(1); }
+}
+
+.alert-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.alert-time {
+  font-family: var(--font-head);
+  font-size: 10px;
+  letter-spacing: 1.1px;
+  color: var(--muted);
+}
+
+.badge {
+  font-family: var(--font-head);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.badge-bullish { color: var(--green); border-color: rgba(0, 255, 136, 0.4); background: rgba(0, 255, 136, 0.1); }
+.badge-bearish { color: var(--red);   border-color: rgba(255, 51, 85, 0.4);  background: rgba(255, 51, 85, 0.1); }
+.badge-neutral { color: var(--muted); border-color: rgba(107, 122, 158, 0.4); background: rgba(107, 122, 158, 0.12); }
+.badge-demo {
+  color: var(--magenta);
+  border-color: rgba(255, 0, 170, 0.45);
+  background: rgba(255, 0, 170, 0.12);
+}
+
+.urgency-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+.urgency-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+.urgency-dot.high   { background: var(--red);  box-shadow: 0 0 8px var(--red);  animation: blink 1s ease-in-out infinite; }
+.urgency-dot.medium { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.urgency-dot.low    { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+
+.alert-summary {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.section-label {
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: var(--muted);
+  margin: 10px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.25), transparent);
+}
+
+.stock-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  margin-bottom: 7px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.stock-ticker {
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  min-width: 72px;
+}
+.stock-ticker.up   { color: var(--green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.45); }
+.stock-ticker.down { color: var(--red);   text-shadow: 0 0 10px rgba(255, 51, 85, 0.45); }
+
+.stock-info { flex: 1; min-width: 0; }
+.stock-reason {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.stock-conf {
+  font-family: var(--font-head);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.35);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: var(--cyan);
+}
+.chip.sector { background: rgba(255, 0, 170, 0.08); border-color: rgba(255, 0, 170, 0.22); color: var(--magenta); }
+.chip.poly   { background: rgba(255, 204, 0, 0.08); border-color: rgba(255, 204, 0, 0.22); color: var(--gold); }
+.chip.kw     { background: rgba(107, 122, 158, 0.12); border-color: rgba(107, 122, 158, 0.25); color: var(--muted); }
+.chip.poly-link {
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--cyan);
+  border-color: rgba(0, 240, 255, 0.35);
+  background: rgba(0, 240, 255, 0.08);
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.12s;
+}
+.chip.poly-link:hover {
+  color: var(--magenta);
+  border-color: rgba(255, 0, 170, 0.55);
+  box-shadow: 0 0 14px rgba(255, 0, 170, 0.45), 0 0 22px rgba(0, 240, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.trade-signal {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.14), rgba(255, 204, 0, 0.05));
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow: 0 0 16px rgba(255, 204, 0, 0.12);
+}
+.trade-signal .ts-label {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  margin-bottom: 4px;
+  opacity: 0.85;
+}
+
+.alert-source {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.75;
+  line-height: 1.45;
+  max-height: 2.9em;
+  overflow: hidden;
+}
+
+/* ===== Analyze bar ===== */
+.analyze-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 22px;
+  background: rgba(18, 18, 42, 0.85);
+  border-top: 1px solid var(--border);
+}
+.analyze-label {
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  color: var(--magenta);
+  white-space: nowrap;
+}
+.analyze-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(10, 10, 26, 0.9);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.analyze-input:focus {
+  border-color: var(--magenta);
+  box-shadow: var(--glow-magenta);
+}
+.analyze-input::placeholder { color: var(--muted); }
+
+.bottombar {
+  height: var(--bottombar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 0 22px;
+  background: rgba(10, 10, 26, 0.9);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  overflow-x: auto;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+.stat-label {
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: var(--muted);
+}
+.stat-value {
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+.stat-value.green { color: var(--green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.4); }
+.stat-value.red   { color: var(--red);   text-shadow: 0 0 10px rgba(255, 51, 85, 0.4); }
+.stat-value.gold  { color: var(--gold);  text-shadow: 0 0 10px rgba(255, 204, 0, 0.4); }
+
+.footer-note {
+  margin-left: auto;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.footer-note a {
+  color: var(--cyan);
+  text-decoration: none;
+}
+.footer-note a:hover { color: var(--magenta); }
+
+.conn-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+}
+.conn-note::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.conn-note.live { color: var(--green); }
+.conn-note.idle { color: var(--green); opacity: 0.7; }
+.conn-note.idle::before { box-shadow: none; animation: none; }
+.conn-note.reconnecting { color: var(--gold); }
+.conn-note.down { color: var(--red); }
+
+.toast {
+  position: fixed;
+  bottom: calc(var(--bottombar-h) + 62px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 12px 22px;
+  border-radius: 12px;
+  background: rgba(18, 18, 42, 0.95);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.25);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 100;
+  max-width: 90vw;
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { border-color: var(--red); box-shadow: 0 0 24px rgba(255, 51, 85, 0.3); }
+
+@media (max-width: 1280px) {
+  .main {
+    grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.1fr) minmax(300px, 1.2fr);
+    gap: 10px;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 980px) {
+  html, body { overflow: auto; height: auto; }
+  .app { height: auto; min-height: 100vh; }
+  .main {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    overflow: visible;
+  }
+  .col { max-height: none; }
+  .col-body { max-height: 420px; }
+  .col-video .col-body { max-height: none; }
+  .col-video { order: -1; }
+  .topbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .controls { margin-left: 0; width: 100%; max-width: none; flex-wrap: wrap; }
+  .url-input { flex-basis: 100%; }
+  .logo { width: 100%; }
+  .analyze-bar {
+    flex-wrap: wrap;
+    padding: 12px 14px;
+  }
+  .analyze-input { flex-basis: 100%; order: 2; }
+  .bottombar {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 14px 22px;
+    padding: 12px 16px;
+  }
+  .footer-note { margin-left: 0; width: 100%; white-space: normal; }
+}
+
+@media (max-width: 560px) {
+  .logo { font-size: 15px; letter-spacing: 1.4px; }
+  .btn { padding: 11px 16px; letter-spacing: 1.2px; }
+  .col-body { padding: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-scanlines"></div>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo">NEON MARKET SCANNER</div>
+    <div class="sim-badge" title="Static demo — no backend required">◆ SIMULATED LIVE</div>
+    <div class="status-pill idle" id="statusPill">
+      <span class="status-dot"></span>
+      <span id="statusText">IDLE</span>
+    </div>
+    <div class="controls">
+      <input class="url-input" id="urlInput" type="text" placeholder="YouTube or X/Twitter URL (optional)..." spellcheck="false" autocomplete="off">
+      <button class="btn btn-start" id="btnStart">START</button>
+      <button class="btn btn-stop" id="btnStop">STOP</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- LEFT: VIDEO -->
+    <section class="col col-video">
+      <div class="col-header">
+        <div class="col-title">VIDEO FEED</div>
+        <div class="col-badge" id="videoBadge">NO SIGNAL</div>
+      </div>
+      <div class="col-body">
+        <div style="width:100%">
+          <div class="video-wrap" id="videoWrap">
+            <div class="video-placeholder" id="videoPlaceholder">
+              <div class="radar"><div class="radar-pulse"></div></div>
+              <div class="placeholder-text">AWAITING SIGNAL</div>
+            </div>
+          </div>
+          <div class="video-meta" id="videoMeta">
+            <strong>Source:</strong> <span id="sourceLabel">none</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER: TRANSCRIPT -->
+    <section class="col">
+      <div class="col-header">
+        <div class="col-title magenta">LIVE TRANSCRIPT</div>
+        <div class="col-badge" id="feedBadge">0</div>
+      </div>
+      <div class="col-body" id="transcriptFeed">
+        <div class="feed-empty" id="feedEmpty">Press START — simulated speech segments appear here…</div>
+      </div>
+    </section>
+
+    <!-- RIGHT: ALERTS -->
+    <section class="col">
+      <div class="col-header">
+        <div class="col-title gold">MARKET ALERTS</div>
+        <div class="col-badge" id="alertBadge">0</div>
+      </div>
+      <div class="col-body" id="alertFeed">
+        <div class="feed-empty" id="alertEmpty">No alerts yet. Press START — each demo segment is analyzed automatically.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ANALYZE BAR -->
+  <div class="analyze-bar">
+    <span class="analyze-label">DEMO ANALYZER</span>
+    <input class="analyze-input" id="analyzeInput" type="text" placeholder="Type a statement..." spellcheck="false" autocomplete="off">
+    <button class="btn btn-analyze" id="btnAnalyze">ANALYZE</button>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <footer class="bottombar">
+    <div class="stat">
+      <span class="stat-label">SEGMENTS</span>
+      <span class="stat-value" id="statSegments">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">BULLISH</span>
+      <span class="stat-value green" id="statBullish">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">BEARISH</span>
+      <span class="stat-value red" id="statBearish">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">TOP TICKER</span>
+      <span class="stat-value gold" id="statTicker">—</span>
+    </div>
+    <div class="conn-note" id="connNote">DEMO MODE</div>
+    <div class="footer-note">NEON Market Scanner — Demo. Live pipeline runs locally. <a href="https://github.com/2TheMooon/neon-market-scanner" target="_blank" rel="noopener noreferrer">github.com/2TheMooon/neon-market-scanner</a></div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ============================================================
+  // DEMO DATA — Trump rally speech (tariffs / energy / immigration)
+  // Shape matches GLM-5.3 analyzer output. No backend calls.
+  // ============================================================
+  const DEMO_DATA = [
+    {
+      ts: '2026-02-14T18:02:11Z',
+      text: 'We are going to put MASSIVE tariffs on China — nobody has ever seen anything like it. Steel, aluminum, everything. We will protect American workers like never before!',
+      analysis: {
+        summary: 'Trump pledges massive new tariffs on Chinese imports — steel and aluminum named explicitly. Trade-war risk spikes.',
+        sentiment: 'bullish',
+        urgency: 'high',
+        stocks: [
+          { ticker: 'X', direction: 'up', confidence: 0.82, reason: 'US Steel benefits directly from protective tariffs on imported steel.' },
+          { ticker: 'NUE', direction: 'up', confidence: 0.78, reason: 'Nucor is the largest US steelmaker — tariff shield lifts margins.' },
+          { ticker: 'AAPL', direction: 'down', confidence: 0.71, reason: 'Heavy China manufacturing exposure; tariffs raise COGS and invite retaliation.' },
+          { ticker: 'WMT', direction: 'down', confidence: 0.64, reason: 'Retailer imports large volumes from China — consumer price pressure.' }
+        ],
+        sectors: ['Steel & Metals', 'Retail', 'Consumer Electronics', 'Industrials'],
+        polymarket: [
+          {
+            market: 'US-China trade war escalation in 2026?',
+            direction: 'up',
+            confidence: 0.76,
+            reason: 'Rhetoric points to a new tariff package within weeks.',
+            slug: 'us-china-trade-war-2026',
+            url: 'https://polymarket.com/event/us-china-trade-war-2026'
+          },
+          {
+            market: 'New US tariffs on China before July?',
+            direction: 'up',
+            confidence: 0.7,
+            reason: 'Speech names steel and aluminum as first targets.',
+            slug: 'us-tariffs-on-china-before-july',
+            url: 'https://polymarket.com/event/us-tariffs-on-china-before-july'
+          }
+        ],
+        keywords: ['tariffs', 'China', 'steel', 'aluminum', 'trade war'],
+        trade_signal: 'LONG steel names (X, NUE) on tariff confirmation; hedge with short AAPL / WMT basket on China exposure.'
+      }
+    },
+    {
+      ts: '2026-02-14T18:06:40Z',
+      text: 'Drill, baby, drill! We are going to drill like never before. Energy independence is national security. We will slash regulations on day one — and gasoline will be cheap again.',
+      analysis: {
+        summary: 'Energy dominance push: deregulation + expanded drilling. Bullish for E&P, mixed for renewables.',
+        sentiment: 'bullish',
+        urgency: 'medium',
+        stocks: [
+          { ticker: 'XOM', direction: 'up', confidence: 0.8, reason: 'Largest US oil major — permitting relief unlocks upstream growth.' },
+          { ticker: 'CVX', direction: 'up', confidence: 0.74, reason: 'Permian-heavy portfolio benefits from faster drilling approvals.' },
+          { ticker: 'TSLA', direction: 'down', confidence: 0.58, reason: 'Cheap gasoline softens the EV adoption narrative near-term.' }
+        ],
+        sectors: ['Oil & Gas', 'Energy', 'Automotive', 'Renewables'],
+        polymarket: [
+          {
+            market: 'US crude production record in 2026?',
+            direction: 'up',
+            confidence: 0.68,
+            reason: 'Deregulation + high-signal support from the top.',
+            slug: 'us-crude-production-record-2026',
+            url: 'https://polymarket.com/event/us-crude-production-record-2026'
+          },
+          {
+            market: 'WTI above $80 in Q2?',
+            direction: 'down',
+            confidence: 0.55,
+            reason: 'Supply expansion rhetoric is a medium-term price headwind.',
+            slug: 'wti-above-80-in-q2',
+            url: 'https://polymarket.com/event/wti-above-80-in-q2'
+          }
+        ],
+        keywords: ['drill baby drill', 'energy independence', 'deregulation', 'oil', 'gasoline'],
+        trade_signal: 'LONG XOM / CVX on executive-order headlines; watch WTI for a supply-glut fade if permits open fast.'
+      }
+    },
+    {
+      ts: '2026-02-14T18:11:05Z',
+      text: 'We will secure the border on day one. Mass deportations of criminal illegal aliens. If you come here illegally, you will be sent home. This country belongs to its citizens.',
+      analysis: {
+        summary: 'Hardline immigration policy: border closure + mass deportations. Labor-tight industries face wage pressure.',
+        sentiment: 'bearish',
+        urgency: 'high',
+        stocks: [
+          { ticker: 'WMT', direction: 'down', confidence: 0.57, reason: 'Agriculture and logistics labor costs rise if workforce shrinks.' },
+          { ticker: 'AAPL', direction: 'down', confidence: 0.52, reason: 'Indirect: consumer demand and supply-chain sentiment hit.' }
+        ],
+        sectors: ['Agriculture', 'Construction', 'Logistics', 'Staffing'],
+        polymarket: [
+          {
+            market: 'US net immigration negative in 2026?',
+            direction: 'up',
+            confidence: 0.62,
+            reason: 'Deportation program would flip the net number.',
+            slug: 'us-net-immigration-negative-2026',
+            url: 'https://polymarket.com/event/us-net-immigration-negative-2026'
+          },
+          {
+            market: 'Border emergency declared in first 100 days?',
+            direction: 'up',
+            confidence: 0.71,
+            reason: 'Speech commits to day-one executive action.',
+            slug: 'border-emergency-first-100-days',
+            url: 'https://polymarket.com/event/border-emergency-first-100-days'
+          }
+        ],
+        keywords: ['immigration', 'border', 'deportations', 'labor', 'day one'],
+        trade_signal: 'Watch agriculture / construction wage inflation; staffing agencies (Kforce, RHI) face volume risk. Defensive consumer names over growth retail.'
+      }
+    },
+    {
+      ts: '2026-02-14T18:15:33Z',
+      text: 'China took our jobs, they took our factories. Not anymore. We will bring manufacturing back to America — and companies that leave will pay a price when they try to sell back into our country.',
+      analysis: {
+        summary: 'Onshoring mandate + penalty tariffs for offshoring. Domestic manufacturing renaissance narrative.',
+        sentiment: 'bullish',
+        urgency: 'medium',
+        stocks: [
+          { ticker: 'X', direction: 'up', confidence: 0.73, reason: 'Domestic industrial capacity demand rises with onshoring.' },
+          { ticker: 'NUE', direction: 'up', confidence: 0.69, reason: 'Steel intensity of new US factories lifts volumes.' },
+          { ticker: 'AAPL', direction: 'down', confidence: 0.66, reason: 'Forced supply-chain relocation is a multi-year capex drag.' },
+          { ticker: 'TSLA', direction: 'up', confidence: 0.6, reason: 'US gigafactories align with made-in-America push.' }
+        ],
+        sectors: ['Manufacturing', 'Steel & Metals', 'Semiconductors', 'Automotive'],
+        polymarket: [
+          {
+            market: 'US manufacturing jobs up 500k in 2026?',
+            direction: 'up',
+            confidence: 0.54,
+            reason: 'Policy tailwind, but labor supply is a constraint.',
+            slug: 'us-manufacturing-jobs-up-500k-2026',
+            url: 'https://polymarket.com/event/us-manufacturing-jobs-up-500k-2026'
+          },
+          {
+            market: 'Apple expands US production in 2026?',
+            direction: 'up',
+            confidence: 0.58,
+            reason: 'Penalty tariffs make US assembly more attractive.',
+            slug: 'apple-us-production-2026',
+            url: 'https://polymarket.com/event/apple-us-production-2026'
+          }
+        ],
+        keywords: ['manufacturing', 'onshoring', 'factories', 'China', 'made in America'],
+        trade_signal: 'LONG industrial/steel complex; TSLA as a domestic-manufacturing proxy. Avoid import-heavy retail on tariff headlines.'
+      }
+    },
+    {
+      ts: '2026-02-14T18:19:58Z',
+      text: 'We will cut taxes for families, cut taxes for workers, and cut the regulations that are strangling our small businesses. The American dream is coming back — bigger and better than ever.',
+      analysis: {
+        summary: 'Tax cuts + deregulation for small business. Pro-growth fiscal stance; deficit questions linger.',
+        sentiment: 'bullish',
+        urgency: 'low',
+        stocks: [
+          { ticker: 'WMT', direction: 'up', confidence: 0.61, reason: 'Consumer disposable income boost supports retail volumes.' },
+          { ticker: 'XOM', direction: 'up', confidence: 0.55, reason: 'Corporate tax cut drops straight into oil-major earnings.' }
+        ],
+        sectors: ['Consumer', 'Financials', 'Small Caps', 'Retail'],
+        polymarket: [
+          {
+            market: 'New tax bill passes Congress in 2026?',
+            direction: 'up',
+            confidence: 0.6,
+            reason: 'Unified-government math favors a reconciliation path.',
+            slug: 'new-tax-bill-2026',
+            url: 'https://polymarket.com/event/new-tax-bill-2026'
+          },
+          {
+            market: 'US federal deficit above $2T in FY2027?',
+            direction: 'up',
+            confidence: 0.64,
+            reason: 'Tax cuts without spending offsets widen the gap.',
+            slug: 'us-deficit-above-2t-fy2027',
+            url: 'https://polymarket.com/event/us-deficit-above-2t-fy2027'
+          }
+        ],
+        keywords: ['tax cuts', 'deregulation', 'small business', 'American dream', 'fiscal'],
+        trade_signal: 'Risk-on tilt: long small caps / consumer discretionary. Watch the long end of the curve — deficit talk can hit bonds first.'
+      }
+    },
+    {
+      ts: '2026-02-14T18:24:12Z',
+      text: 'They used to laugh at us. They are not laughing anymore. America is respected again — and if our enemies even think about testing us, they will learn very quickly that peace comes through strength.',
+      analysis: {
+        summary: 'Peace-through-strength foreign policy posture. Defense spending and geopolitical risk premium rise.',
+        sentiment: 'neutral',
+        urgency: 'medium',
+        stocks: [
+          { ticker: 'X', direction: 'up', confidence: 0.5, reason: 'Historical correlation: defense buildup supports steel plate demand.' },
+          { ticker: 'AAPL', direction: 'down', confidence: 0.45, reason: 'Geopolitical noise weighs on global tech supply chains.' }
+        ],
+        sectors: ['Defense', 'Aerospace', 'Security', 'Industrials'],
+        polymarket: [
+          {
+            market: 'US defense budget increase in FY2027?',
+            direction: 'up',
+            confidence: 0.67,
+            reason: 'Strength rhetoric maps to appropriations.',
+            slug: 'us-defense-budget-fy2027',
+            url: 'https://polymarket.com/event/us-defense-budget-fy2027'
+          },
+          {
+            market: 'Major US military action in 2026?',
+            direction: 'down',
+            confidence: 0.52,
+            reason: 'Rhetoric signals deterrence, not immediate campaign.',
+            slug: 'major-us-military-action-2026',
+            url: 'https://polymarket.com/event/major-us-military-action-2026'
+          }
+        ],
+        keywords: ['peace through strength', 'defense', 'foreign policy', 'America', 'enemies'],
+        trade_signal: 'Neutral-to-long defense complex. No directional equity call on the speech alone — watch defense NDAA headlines for catalysts.'
+      }
+    }
+  ];
+
+  // Fallback entry for the text analyzer when nothing matches
+  const FALLBACK_ENTRY = {
+    ts: new Date().toISOString(),
+    text: '',
+    analysis: {
+      summary: 'DEMO analysis: statement received. No live model is connected — returning a canned market-neutral read.',
+      sentiment: 'neutral',
+      urgency: 'low',
+      stocks: [
+        { ticker: 'XOM', direction: 'up', confidence: 0.52, reason: 'Energy is the default demo ticker for unmatched input.' }
+      ],
+      sectors: ['Energy', 'Macro'],
+      polymarket: [
+        {
+          market: 'Will markets finish the week higher?',
+          direction: 'up',
+          confidence: 0.5,
+          reason: 'Coin-flip demo market for unmatched statements.',
+          slug: 'markets-higher-this-week',
+          url: 'https://polymarket.com/event/markets-higher-this-week'
+        }
+      ],
+      keywords: ['demo', 'unmatched', 'neutral'],
+      trade_signal: 'No edge from demo matching — this is a placeholder read. Connect the live pipeline for real analysis.'
+    }
+  };
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const statusPill = $('statusPill');
+  const statusText = $('statusText');
+  const urlInput = $('urlInput');
+  const btnStart = $('btnStart');
+  const btnStop = $('btnStop');
+  const analyzeInput = $('analyzeInput');
+  const btnAnalyze = $('btnAnalyze');
+  const videoWrap = $('videoWrap');
+  const videoPlaceholder = $('videoPlaceholder');
+  const videoBadge = $('videoBadge');
+  const sourceLabel = $('sourceLabel');
+  const transcriptFeed = $('transcriptFeed');
+  const feedEmpty = $('feedEmpty');
+  const feedBadge = $('feedBadge');
+  const alertFeed = $('alertFeed');
+  const alertEmpty = $('alertEmpty');
+  const alertBadge = $('alertBadge');
+  const statSegments = $('statSegments');
+  const statBullish = $('statBullish');
+  const statBearish = $('statBearish');
+  const statTicker = $('statTicker');
+  const connNote = $('connNote');
+  const toastEl = $('toast');
+
+  // ---------- State ----------
+  const state = {
+    alertCount: 0,
+    transcriptCount: 0,
+    bullish: 0,
+    bearish: 0,
+    tickerCounts: {},
+    seenAlerts: new Set(),
+    seenTranscripts: new Set(),
+    feedRunning: false,
+    feedIndex: 0,
+    feedTimer: null
+  };
+
+  // ---------- Helpers ----------
+  function extractYouTubeId(url) {
+    if (!url) return null;
+    const s = String(url).trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+
+    let m = s.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    m = s.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+    if (m) return m[1];
+
+    return null;
+  }
+
+  function extractTweetId(url) {
+    if (!url) return null;
+    const s = String(url).trim();
+    const m = s.match(/(?:x|twitter)\.com\/\w+\/status\/(\d+)/);
+    return m ? m[1] : null;
+  }
+
+  function detectPlatform(url) {
+    const s = String(url || '').toLowerCase();
+    if (/youtube|youtu\.be/.test(s)) return 'youtube';
+    if (/x\.com|twitter\.com|t\.co/.test(s)) return 'twitter';
+    return 'unknown';
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function formatTime(iso) {
+    if (!iso) return '--:--:--';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso).slice(11, 19) || String(iso).slice(0, 8) || '--:--:--';
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    } catch (e) {
+      return '--:--:--';
+    }
+  }
+
+  function formatConf(c) {
+    if (c == null || isNaN(c)) return '—';
+    const n = Number(c);
+    const pct = n <= 1 ? n * 100 : n;
+    return pct.toFixed(0) + '%';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  let toastTimer = null;
+  function toast(msg, isErr) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle('err', !!isErr);
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3200);
+  }
+
+  // ---------- Status pill ----------
+  function setFeedStatus(running) {
+    state.feedRunning = !!running;
+    if (running) {
+      statusPill.classList.remove('idle');
+      statusText.textContent = 'SIMULATED LIVE';
+    } else {
+      statusPill.classList.add('idle');
+      statusText.textContent = 'IDLE';
+    }
+    btnStart.disabled = !!running;
+    btnStop.disabled = !running;
+    if (running) {
+      connNote.className = 'conn-note live';
+      connNote.textContent = 'DEMO FEED: RUNNING';
+    } else {
+      connNote.className = 'conn-note idle';
+      connNote.textContent = 'DEMO MODE';
+    }
+  }
+
+  // ---------- Video ----------
+  function setVideoFromUrl(url) {
+    const platform = detectPlatform(url);
+
+    if (platform === 'twitter') {
+      const tid = extractTweetId(url);
+      if (!tid) {
+        toast('Could not parse a Twitter/X status ID', true);
+        return;
+      }
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://platform.twitter.com/embed/Tweet.html?id=' + encodeURIComponent(tid) + '&theme=dark';
+      iframe.allow = 'autoplay; encrypted-media';
+      iframe.allowFullscreen = true;
+      iframe.title = 'X/Twitter post';
+      iframe.style.minHeight = '480px';
+      const old = videoWrap.querySelector('iframe');
+      if (old) old.remove();
+      videoPlaceholder.classList.add('hidden');
+      videoWrap.appendChild(iframe);
+      videoBadge.textContent = 'X / TWITTER';
+      videoBadge.style.color = 'var(--cyan)';
+      videoBadge.style.borderColor = 'rgba(0,240,255,0.35)';
+      return;
+    }
+
+    const id = extractYouTubeId(url);
+    if (!id) {
+      if (url && String(url).length > 0) {
+        toast('Could not parse video ID (supported: YouTube, X/Twitter)', true);
+      }
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    iframe.title = 'YouTube video';
+
+    const old = videoWrap.querySelector('iframe');
+    if (old) old.remove();
+    videoPlaceholder.classList.add('hidden');
+    videoWrap.appendChild(iframe);
+    videoBadge.textContent = 'LIVE';
+    videoBadge.style.color = 'var(--green)';
+    videoBadge.style.borderColor = 'rgba(0,255,136,0.35)';
+  }
+
+  function clearVideo() {
+    const old = videoWrap.querySelector('iframe');
+    if (old) old.remove();
+    videoPlaceholder.classList.remove('hidden');
+    videoBadge.textContent = 'NO SIGNAL';
+    videoBadge.style.color = '';
+    videoBadge.style.borderColor = '';
+    sourceLabel.textContent = 'none';
+  }
+
+  // ---------- Transcript rendering ----------
+  function renderTranscriptEntry(ts, text, key, tag) {
+    if (key && state.seenTranscripts.has(key)) return;
+    if (key) state.seenTranscripts.add(key);
+
+    if (feedEmpty && feedEmpty.parentNode) feedEmpty.remove();
+
+    const el = document.createElement('div');
+    el.className = 't-entry';
+    el.innerHTML =
+      '<div class="t-entry-head">' +
+        '<span class="t-time">' + escapeHtml(formatTime(ts)) + '</span>' +
+        '<span class="t-tag">' + escapeHtml(tag || 'SPEECH') + '</span>' +
+      '</div>' +
+      '<div class="t-text">' + escapeHtml(text) + '</div>';
+
+    transcriptFeed.insertBefore(el, transcriptFeed.firstChild);
+    state.transcriptCount++;
+    feedBadge.textContent = String(state.transcriptCount);
+
+    while (transcriptFeed.children.length > 200) {
+      transcriptFeed.removeChild(transcriptFeed.lastChild);
+    }
+  }
+
+  // ---------- Alert rendering ----------
+  function urgencyClass(u) {
+    const s = String(u || 'low').toLowerCase();
+    if (s === 'high') return 'high';
+    if (s === 'medium') return 'medium';
+    return 'low';
+  }
+
+  function sentimentBadge(sent) {
+    const s = String(sent || 'neutral').toLowerCase();
+    if (s === 'bullish') return '<span class="badge badge-bullish">BULLISH</span>';
+    if (s === 'bearish') return '<span class="badge badge-bearish">BEARISH</span>';
+    return '<span class="badge badge-neutral">NEUTRAL</span>';
+  }
+
+  function renderStocks(stocks) {
+    if (!stocks || !stocks.length) return '';
+    let html = '<div class="section-label">STOCKS</div>';
+    stocks.forEach(function (st) {
+      const dir = String(st.direction || 'up').toLowerCase() === 'down' ? 'down' : 'up';
+      const arrow = dir === 'up' ? '🟢↑' : '🔴↓';
+      html +=
+        '<div class="stock-row">' +
+          '<div class="stock-ticker ' + dir + '">' + arrow + ' ' + escapeHtml(st.ticker || '?') + '</div>' +
+          '<div class="stock-info">' +
+            '<div class="stock-reason">' + escapeHtml(st.reason || '') + '</div>' +
+          '</div>' +
+          '<div class="stock-conf" data-conf="' + escapeHtml(String(st.confidence != null ? st.confidence : '')) + '">' +
+            formatConf(st.confidence) +
+          '</div>' +
+        '</div>';
+    });
+    return html;
+  }
+
+  function renderChips(label, items, cls) {
+    if (!items || !items.length) return '';
+    let html = '<div class="section-label">' + label + '</div><div class="chip-row">';
+    items.forEach(function (it) {
+      let text;
+      if (typeof it === 'string') text = it;
+      else if (it && typeof it === 'object') {
+        text = it.name || it.title || it.label || it.keyword || it.ticker || it.question || JSON.stringify(it);
+      } else text = String(it);
+      html += '<span class="chip ' + cls + '">' + escapeHtml(text) + '</span>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function polymarketHref(it) {
+    if (!it || typeof it !== 'object') return null;
+    if (it.url) {
+      const u = String(it.url).trim();
+      if (/^https?:\/\//i.test(u)) return u;
+      return 'https://polymarket.com/event/' + u.replace(/^\/+/, '');
+    }
+    if (it.slug) {
+      return 'https://polymarket.com/event/' + String(it.slug).replace(/^\/+/, '');
+    }
+    return null;
+  }
+
+  function renderPolymarket(items) {
+    if (!items || !items.length) return '';
+    let html = '<div class="section-label">POLYMARKET</div><div class="chip-row">';
+    items.forEach(function (it) {
+      let question, conf;
+      if (typeof it === 'string') {
+        question = it;
+      } else if (it && typeof it === 'object') {
+        question = it.market || it.question || it.name || it.title || it.label || it.keyword || '';
+        conf = it.confidence != null ? it.confidence
+             : it.prob != null ? it.prob
+             : it.probability != null ? it.probability
+             : null;
+        if (!question) question = it.slug || it.url || JSON.stringify(it);
+      } else {
+        question = String(it);
+      }
+      const text = (conf != null && conf !== '' && !isNaN(Number(conf)))
+        ? question + ' (' + formatConf(conf) + ')'
+        : question;
+      const href = polymarketHref(it);
+      if (href) {
+        html += '<a class="chip poly-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(text) + '</a>';
+      } else {
+        html += '<span class="chip poly">' + escapeHtml(text) + '</span>';
+      }
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function alertKey(entry) {
+    return (entry.ts || '') + '|' + (entry.text || '').slice(0, 80);
+  }
+
+  function renderAlert(entry, opts) {
+    opts = opts || {};
+    const key = opts.force ? 'demo-' + Date.now() + '-' + Math.random() : alertKey(entry);
+    if (!opts.force && state.seenAlerts.has(key)) return;
+    state.seenAlerts.add(key);
+
+    if (alertEmpty && alertEmpty.parentNode) alertEmpty.remove();
+
+    const a = entry.analysis || {};
+    const urgency = urgencyClass(a.urgency);
+    const sentiment = String(a.sentiment || 'neutral').toLowerCase();
+
+    if (sentiment === 'bullish') state.bullish++;
+    else if (sentiment === 'bearish') state.bearish++;
+
+    const stocks = a.stocks || [];
+    stocks.forEach(function (st) {
+      const t = String(st.ticker || '?').toUpperCase();
+      state.tickerCounts[t] = (state.tickerCounts[t] || 0) + 1;
+    });
+
+    const card = document.createElement('div');
+    card.className = 'alert-card urgency-' + urgency;
+
+    let html = '';
+    html += '<div class="alert-top">';
+    html += '<span class="alert-time">' + escapeHtml(formatTime(entry.ts)) + '</span>';
+    html += sentimentBadge(a.sentiment);
+    if (opts.demo) html += '<span class="badge badge-demo">DEMO ANALYSIS</span>';
+    html += '<span class="urgency-chip"><span class="urgency-dot ' + urgency + '"></span>' + urgency.toUpperCase() + '</span>';
+    html += '</div>';
+
+    html += '<div class="alert-summary">' + escapeHtml(a.summary || entry.text || '(no summary)') + '</div>';
+    html += renderStocks(stocks);
+    html += renderChips('SECTORS', a.sectors, 'sector');
+    html += renderPolymarket(a.polymarket);
+    html += renderChips('KEYWORDS', a.keywords, 'kw');
+
+    if (a.trade_signal) {
+      html += '<div class="trade-signal"><span class="ts-label">TRADE SIGNAL</span>' + escapeHtml(a.trade_signal) + '</div>';
+    }
+
+    if (entry.text && entry.text !== a.summary) {
+      html += '<div class="alert-source">' + escapeHtml(entry.text) + '</div>';
+    }
+
+    card.innerHTML = html;
+    alertFeed.insertBefore(card, alertFeed.firstChild);
+
+    state.alertCount++;
+    alertBadge.textContent = String(state.alertCount);
+
+    while (alertFeed.children.length > 150) {
+      alertFeed.removeChild(alertFeed.lastChild);
+    }
+
+    updateStats();
+    animateCountUps(card);
+  }
+
+  function updateStats() {
+    statSegments.textContent = String(state.transcriptCount || state.alertCount);
+    statBullish.textContent = String(state.bullish);
+    statBearish.textContent = String(state.bearish);
+
+    let top = '—';
+    let topN = 0;
+    Object.keys(state.tickerCounts).forEach(function (t) {
+      if (state.tickerCounts[t] > topN) {
+        topN = state.tickerCounts[t];
+        top = t;
+      }
+    });
+    statTicker.textContent = top;
+  }
+
+  function ingestEntry(entry, opts) {
+    if (!entry) return;
+    opts = opts || {};
+
+    if (entry.text) {
+      renderTranscriptEntry(entry.ts, entry.text, opts.force ? null : alertKey(entry), opts.tag);
+    }
+
+    if (entry.analysis) {
+      renderAlert(entry, opts);
+    }
+  }
+
+  // ---------- Simulated live feed ----------
+  const FEED_INTERVAL_MIN = 8000;
+  const FEED_INTERVAL_MAX = 10000;
+
+  function nextFeedDelay() {
+    return FEED_INTERVAL_MIN + Math.floor(Math.random() * (FEED_INTERVAL_MAX - FEED_INTERVAL_MIN + 1));
+  }
+
+  function scheduleNext() {
+    if (!state.feedRunning) return;
+    clearTimeout(state.feedTimer);
+    state.feedTimer = setTimeout(function () {
+      if (!state.feedRunning) return;
+      if (state.feedIndex >= DEMO_DATA.length) {
+        // loop from the top so the demo keeps going
+        state.feedIndex = 0;
+        toast('Demo feed looping — restarting from the top');
+      }
+      const entry = DEMO_DATA[state.feedIndex++];
+      ingestEntry(entry, {});
+      scheduleNext();
+    }, nextFeedDelay());
+  }
+
+  function startFeed() {
+    if (state.feedRunning) return;
+    setFeedStatus(true);
+
+    const url = urlInput.value.trim();
+    if (url) {
+      setVideoFromUrl(url);
+      sourceLabel.textContent = url.slice(0, 64);
+    } else {
+      sourceLabel.textContent = 'simulated (no video)';
+    }
+
+    // first entry arrives almost immediately so the UI feels alive
+    clearTimeout(state.feedTimer);
+    state.feedTimer = setTimeout(function () {
+      if (!state.feedRunning) return;
+      const entry = DEMO_DATA[state.feedIndex++];
+      ingestEntry(entry, {});
+      scheduleNext();
+    }, 900);
+
+    toast('Simulated live feed started');
+  }
+
+  function stopFeed() {
+    if (!state.feedRunning) {
+      toast('Feed is not running');
+      return;
+    }
+    clearTimeout(state.feedTimer);
+    state.feedTimer = null;
+    setFeedStatus(false);
+    toast('Simulated live feed stopped');
+  }
+
+  // ---------- Text analyzer (demo) ----------
+  function pickDemoEntry(statement) {
+    const s = String(statement || '').toLowerCase();
+    if (!s.trim()) return FALLBACK_ENTRY;
+
+    // score DEMO_DATA by keyword overlap with the typed statement
+    let best = null;
+    let bestScore = 0;
+    DEMO_DATA.forEach(function (entry) {
+      const words = (entry.analysis.keywords || []).join(' ').toLowerCase();
+      let score = 0;
+      (entry.analysis.keywords || []).forEach(function (kw) {
+        if (s.indexOf(String(kw).toLowerCase()) !== -1) score += 2;
+      });
+      if (words) {
+        String(words).split(/\s+/).forEach(function (w) {
+          if (w.length > 3 && s.indexOf(w) !== -1) score += 1;
+        });
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry;
+      }
+    });
+
+    if (best && bestScore > 0) {
+      // clone with the user's statement as the source text
+      return {
+        ts: new Date().toISOString(),
+        text: statement,
+        analysis: best.analysis
+      };
+    }
+    return {
+      ts: new Date().toISOString(),
+      text: statement,
+      analysis: FALLBACK_ENTRY.analysis
+    };
+  }
+
+  function runAnalyze() {
+    const statement = analyzeInput.value.trim();
+    if (!statement) {
+      toast('Type a statement first', true);
+      analyzeInput.focus();
+      return;
+    }
+    const entry = pickDemoEntry(statement);
+    ingestEntry(entry, { force: true, demo: true, tag: 'DEMO INPUT' });
+    analyzeInput.value = '';
+    toast('DEMO analysis generated');
+  }
+
+  // ---------- Count-up animation ----------
+  function animateCountUps(root) {
+    const nodes = (root || document).querySelectorAll('.stock-conf[data-conf]');
+    nodes.forEach(function (el) {
+      if (el.dataset.done === '1') return;
+      const raw = el.getAttribute('data-conf');
+      if (raw == null || raw === '' || isNaN(Number(raw))) return;
+      el.dataset.done = '1';
+      const target = Number(raw);
+      const end = target <= 1 ? target * 100 : target;
+      const start = 0;
+      const dur = 700;
+      const t0 = performance.now();
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = (start + (end - start) * eased).toFixed(0) + '%';
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  const mo = new MutationObserver(function () {
+    animateCountUps(alertFeed);
+  });
+  mo.observe(alertFeed, { childList: true });
+
+  // ---------- Actions ----------
+  btnStart.addEventListener('click', startFeed);
+  btnStop.addEventListener('click', stopFeed);
+  btnAnalyze.addEventListener('click', runAnalyze);
+
+  urlInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      startFeed();
+    }
+  });
+
+  analyzeInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runAnalyze();
+    }
+  });
+
+  // ---------- Boot ----------
+  setFeedStatus(false);
+})();
+</script>
+</body>
+</html>

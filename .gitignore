@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+node_modules/
+package.json
+package-lock.json
+err.log
+out.log
+output/*.jsonl
+output/*.json
+*.png
+.DS_Store
+
+build/
+dist/
+*.spec
+*.exe
